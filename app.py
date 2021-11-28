@@ -1,7 +1,8 @@
 import os
-import time
 import shutil
 import subprocess
+# import jaconv
+import platform, getopt
 from bs4 import BeautifulSoup
 
 relativeSongFolderPath = "data/music"
@@ -16,13 +17,40 @@ audioFormats = {
     "asf": "ASF VBR      (Original, lol .s3v is just .asf but renamed)"
     }
 
+rankMap = {
+    1: "NOV",
+    2: "ADV",
+    3: "EXH",
+    # 4: "INF/GRV",
+    # 5: "MXM"
+    }
+
+rankSuffix = ["1n","2a","3e","4i","4g","4h","5m"]
+
+VERSIONS = {
+    1: "SOUND VOLTEX BOOTH",
+    2: "SOUND VOLTEX ii Infinite Infection",
+    3: "SOUND VOLTEX III GRAVITY WARS",
+    4: "SOUND VOLTEX IV HEAVENLY HAVEN",
+    5: "SOUND VOLTEX V Vivid Wave",
+    6: "SOUND VOLTEX EXCEED GEAR"
+    }
+
+
+if "Windows" == platform.system():
+    FFMPEG = r"ffmpeg.exe"
+else:
+    FFMPEG = r"/usr/bin/env ffmpeg"
+
+OVERWRITE = False
+
 # Credits to giltay @ stackoverflow 120656
 def listdirFP(d):
     return [os.path.join(d, f) for f in os.listdir(d)]
 
 # Friendly interface to use the program
 def CLI():
-    print("Welcome to Walter's SDVX song extractor")
+    print("Welcome to SDVX song extractor")
     # Fetch game folder path
     while True:
         gameFolder = input("Insert path to SDVX folder > ")
@@ -41,7 +69,7 @@ def CLI():
             print("OK starting...")
             break
         else:
-            print("no")
+            print("Incorrect format specified")
     return gameFolder, format
 
 # Gets list of all full relative paths to wanted .s3v files
@@ -60,24 +88,81 @@ def extractSongs(songPaths, format, metadatas):
     outputFolder = os.path.join(outputDir, format)
     if not os.path.exists(outputFolder):
         os.makedirs(outputFolder)
+    for name in VERSIONS.values():
+        if not os.path.exists(os.path.join(outputFolder, name)):
+            os.makedirs(os.path.join(outputFolder, name))
+    # ID3v2.3
+    meta_params = {
+        "title": '%s',                      # Title
+        "artist": '%s',                     # Artist
+        "album_artist": "Various Artist",   # Album Artist
+        "album": '%s',                      # Album
+        "genre": '%s',                      # Genre
+        "date": '%04d',                     # Year
+        "track": '%d',                      # Track
+        "disc": '%d',                       # Disc (Version)
+        "TBPM": '%s',                       # BPM
+    }
     cmd = {
-        "wav": '''ffmpeg.exe -i "%s" -id3v2_version 3 -metadata title="%s" -metadata author="%s" -metadata genre="%s" "%s"''',
-        "mp3": '''ffmpeg.exe -i "%s" -id3v2_version 3 -metadata title="%s" -metadata artist="%s" -metadata genre="%s" -q:a 0 "%s"''',
+        "wav": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3''',
+        "mp3": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3 -q:a 0''',
         "asf": False
-        }[format]
+    }[format]
+
+    for key, meta in meta_params.items():
+        cmd += ''' -metadata:g %s="%s"''' % (key, meta)
+    cmd += r' "%s"'
+
     for songPath in songPaths:
         filename = os.path.basename(songPath)
-        outputFile = os.path.join(outputFolder, filename[:-3] + format)
-        if not os.path.exists(outputFile):
-            songId = filename.split("_")[0]
-            metadata = metadatas[int(songId)]
-            subprocess.call(cmd % (
-                songPath, 
-                metadata["title"], metadata["author"], metadata["genre"],
-                outputFile,
-                ), shell=True) \
-            if cmd else shutil.copy2(songPath, outputFile)
+        songId = filename.split("_")[0]
+        meta = metadatas[int(songId)]
+        outputFile = os.path.join(outputFolder, VERSIONS[meta["version"]], filename[:-3] + format)
+        overwrite = False
+        # overwrite = "&" in meta["title"] or "&" in meta["artist"]
+        if (not os.path.exists(outputFile)) or overwrite:
+            jacketPath = getJacket(songPath,int(songId))
 
+            bpm = meta["bpm_min"]
+            if not bpm == meta["bpm_max"]:
+                bpm = meta["bpm_max"]
+            
+            title = cmdEscape(meta["title"])
+            artist = cmdEscape(meta["artist"])
+            exec_cmd = cmd % (
+                songPath,
+                jacketPath,
+                title, artist,
+                VERSIONS[meta["version"]], meta["genre"],
+                int(meta["release_year"]),
+                int(songId), int(meta["version"]), bpm,
+                outputFile,
+                )
+            try:
+                subprocess.run(exec_cmd, shell=True, check=True) \
+                if cmd else shutil.copy2(songPath, outputFile)
+            except subprocess.CalledProcessError as e:
+                print("\n===================================\n" \
+                    + exec_cmd + \
+                    "\n===================================\n")
+                print("ERROR", e.stderr)
+
+
+def getJacket(songPath, songId):
+    songDir = os.path.dirname(songPath)
+    dataDir = os.path.normpath(os.path.join(songDir, os.path.pardir, os.path.pardir))
+    file_suffix = os.path.splitext(os.path.basename(songPath))[0].split("_")[-1]
+    if file_suffix in rankSuffix :
+        jkFile = 'jk_{0:04d}_{1}_b.png'.format(songId, file_suffix[0])
+        jkPath = os.path.join(songDir,jkFile)
+        if os.path.exists(jkPath):
+            return jkPath
+    for rank in sorted(rankMap.keys(), reverse=True):
+        jkFile = 'jk_{0:04d}_{1}_b.png'.format(songId, rank)
+        jkPath = os.path.join(songDir,jkFile)
+        if os.path.exists(jkPath):
+            return jkPath
+    return os.path.join(dataDir, "graphics", "jk_dummy_b.png")
 
 def extractSongsMetadata(songPaths, gameFolder):
     metadatas={}
@@ -89,13 +174,102 @@ def extractSongsMetadata(songPaths, gameFolder):
     metas = soup.find_all("music")
     for meta in metas:
         metadatas[int(meta["id"])] = {
-            "title": meta.find("title_name").text,
-            "author": meta.find("artist_name").text,
-            "genre": meta.find("genre").text
-            }
+            "title": fixBrokenChars(meta.find("title_name").text),
+            "artist": fixBrokenChars(meta.find("artist_name").text),
+            "genre": meta.find("genre").text,
+            # "title_sort": jaconv.h2z(meta.find("title_yomigana").text),
+            # "artist_sort": jaconv.h2z(meta.find("artist_yomigana").text),
+            "release_year": meta.find("distribution_date").text[:4],
+            "version": int(meta.find("version").text),
+            "bpm_max": (int(meta.find("bpm_max").text) / 100),
+            "bpm_min": (int(meta.find("bpm_min").text) / 100),
+            "volume": int(meta.find("volume").text) / 127.0,
+            "track": int(meta["id"])
+        }
+    
+    metadatas[9001] = {
+        "title": "SOUND VOLTEX Tutorial",
+        "artist": "SOND VOLTEX Team",
+        "genre": "Tutorial",
+        # "title_sort": "さうんどぼるてっくすちゅーとりある",
+        # "artist_sort": "さうんどぼるてっくすちーむ",
+        "release_year": "2020",
+        "version": 6,
+        "bpm_max": 110,
+        "bpm_min": 110,
+        "volume": 127.0,
+        "track": 9001
+    }
+
     return metadatas
 
-def main():
+# ref: https://gist.github.com/hannahherbig/d67c2bfefcca207640c001e0ddd5e000
+def fixBrokenChars(name):
+    map = [
+        # ['\u014d', '驪'],
+        ['\u203E', '~'],
+        ['\u301C', '～'],
+        ['\u49FA', 'ê'],
+        ['\u58ec', 'ê'],
+        ['\u5F5C', 'ū'],
+        ['\u66E6', 'à'],
+        ['\u66E9', 'è'],
+        ['\u745f', 'ō'],
+        ['\u8E94', '🐾'],
+        ['\u8d81', 'Ǣ'],
+        ['\u8e59', 'ℱ'],
+        ['\u91c1', '🍄'],
+        ['\u9448', '♦'],
+        ['\u96cb', 'Ǜ'],
+        ['\u973B', '♠'],
+        ['\u983d', 'ä'],
+        ['\u9A2B', 'á'],
+        ['\u9A69', 'Ø'],
+        ['\u9A6A', 'ō'],
+        ['\u9A6B', 'ā'],
+        ['\u9AAD', 'ü'],
+        ['\u9B2F', 'ī'],
+        ['\u9EF7', 'ē'],
+        ['\u9F63', 'Ú'],
+        ['\u9F67', 'Ä'],
+        ['\u9F6A', '♣'],
+        ['\u9F72', '♥'],
+        ['\u9F76', '♡'],
+        ['\u9F77', 'é'],
+        ['\u9b06', 'Ý'],
+        ['\u9b25', 'Ã'],
+        ['\u9b2e', '¡'],
+        ['\u9efb', '*'],
+        ['\u9f95', '€'],
+    ]
+    for m in map:
+        name = name.replace(m[0], m[1])
+    return name
+
+
+def cmdEscape(str):
+    if "Windows" == platform.system():
+        # For PowerSehll 
+        map = [
+            ['"', '\\"'],
+        ]
+    else:
+        # Linux
+        map = [
+            ['"', '\"'],
+            ['$', '\$']
+        ]
+    for repl in map:
+        str = str.replace(repl[0], repl[1])
+    return str
+
+
+def main(argv = None):
+    try:
+        opts, args = getopt.getopt(argv, "hw",["help","overwrite"])
+    except getopt.GetoptError:
+      print("$0 -i <inputfile> -o <outputfile>")
+
     gameFolder, format = CLI()
     songPaths = getSongPaths(gameFolder)
     metadatas = extractSongsMetadata(songPaths, gameFolder)
