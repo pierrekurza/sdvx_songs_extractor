@@ -254,7 +254,8 @@ def cmdEscape(str):
     if "Windows" == platform.system():
         # For PowerSehll 
         map = [
-            ['"', '\\"'],
+            ['"', '\`"'],
+            # ['&', '\\&'],
         ]
     else:
         # Linux
