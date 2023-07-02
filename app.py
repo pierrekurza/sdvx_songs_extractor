@@ -81,6 +81,8 @@ def getSongPaths(gameFolder):
             for filename in listdirFP(songFolder):
                 if filename.endswith(".s3v") and not filename.endswith("_pre.s3v"):
                     songPaths.append(filename)
+                elif filename.endswith(".2dx") and not filename.endswith("_pre.2dx"):
+                    songPaths.append(filename)
     return songPaths
 
 # Convert and-or copy songs and place them in music directory
@@ -116,6 +118,9 @@ def extractSongs(songPaths, format, metadatas):
     for songPath in songPaths:
         filename = os.path.basename(songPath)
         songId = filename.split("_")[0]
+        if (int(songId) not in metadatas):
+            print("Skipping %s, because removed from music_db.xml" % songId)
+            continue
         meta = metadatas[int(songId)]
         outputFile = os.path.join(outputFolder, VERSIONS[meta["version"]], filename[:-3] + format)
         overwrite = False
@@ -129,6 +134,23 @@ def extractSongs(songPaths, format, metadatas):
             
             title = cmdEscape(meta["title"])
             artist = cmdEscape(meta["artist"])
+
+
+            if filename.endswith(".2dx"):
+                # .2dx file needs convert to wave files
+                iidx_cmd = r'2dx_extract\\bin\\2dx_extract.exe "%s"' % (songPath)
+                subprocess.run(iidx_cmd, shell=True, check=True)
+                filename = filename.replace(".2dx",".s3v")
+                # rename to s3v file
+                songPath = songPath.replace(".2dx", ".s3v")
+                if os.path.exists(songPath) == False:
+                    # copy extracted from .2dx wave file as .s3v
+                    shutil.copy2("1.wav", songPath)
+                # remove temporary files
+                for wfiles in os.listdir("."):
+                    if os.path.isfile(wfiles) and wfiles.endswith(".wav"):
+                        os.remove(wfiles)
+
             exec_cmd = cmd % (
                 songPath,
                 jacketPath,
@@ -165,7 +187,7 @@ def getJacket(songPath, songId):
     return os.path.join(dataDir, "graphics", "jk_dummy_b.png")
 
 def extractSongsMetadata(songPaths, gameFolder):
-    metadatas={}
+    metadatum={}
     songIds = [int(os.path.basename(filename).split("_")[0]) for filename in songPaths]
 
     with open(os.path.join(gameFolder, relativeMusicDbPath), "r", encoding="Shift-JIS", errors="ignore") as xmlFile:
@@ -173,7 +195,7 @@ def extractSongsMetadata(songPaths, gameFolder):
 
     metas = soup.find_all("music")
     for meta in metas:
-        metadatas[int(meta["id"])] = {
+        metadatum[int(meta["id"])] = {
             "title": fixBrokenChars(meta.find("title_name").text),
             "artist": fixBrokenChars(meta.find("artist_name").text),
             "genre": meta.find("genre").text,
@@ -187,7 +209,7 @@ def extractSongsMetadata(songPaths, gameFolder):
             "track": int(meta["id"])
         }
     
-    metadatas[9001] = {
+    metadatum[9001] = {
         "title": "SOUND VOLTEX Tutorial",
         "artist": "SOND VOLTEX Team",
         "genre": "Tutorial",
@@ -201,7 +223,7 @@ def extractSongsMetadata(songPaths, gameFolder):
         "track": 9001
     }
 
-    return metadatas
+    return metadatum
 
 # ref: https://gist.github.com/hannahherbig/d67c2bfefcca207640c001e0ddd5e000
 def fixBrokenChars(name):
@@ -276,7 +298,9 @@ def main(argv = None):
 
     gameFolder, format = CLI()
     songPaths = getSongPaths(gameFolder)
+    print("Loading meta datum...")
     metadatas = extractSongsMetadata(songPaths, gameFolder)
+    print("Extract songs...")
     extractSongs(songPaths, format, metadatas)
-
+    print("Finished !")
 main()

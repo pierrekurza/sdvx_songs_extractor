@@ -1,0 +1,3 @@
+[submodule "2dx_extract"]
+	path = 2dx_extract
+	url = https://github.com/iDestyKK/2dx_extract
