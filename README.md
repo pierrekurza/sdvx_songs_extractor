@@ -10,6 +10,7 @@ extracted each music are included cover images, album name by versions, track nu
 
 ```
 pip install bs4
+pip install lxml
 ```
 
 ## How to use
