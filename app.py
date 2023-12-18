@@ -15,7 +15,7 @@ audioFormats = {
     "mp3": "MP3 V0       (verly gud bang for your disk space buck)",
     "wav": "WAV 1411kbps (only choose this if you hate .ASF format)",
     "asf": "ASF VBR      (Original, lol .s3v is just .asf but renamed)"
-    }
+}
 
 rankMap = {
     1: "NOV",
@@ -23,19 +23,18 @@ rankMap = {
     3: "EXH",
     # 4: "INF/GRV",
     # 5: "MXM"
-    }
+}
 
-rankSuffix = ["1n","2a","3e","4i","4g","4h","5m"]
+rankSuffix = ["1n", "2a", "3e", "4i", "4g", "4h", "5m"]
 
 VERSIONS = {
     1: "SOUND VOLTEX BOOTH",
-    2: "SOUND VOLTEX ii Infinite Infection",
+    2: "SOUND VOLTEX II INFINITE INFECTION",
     3: "SOUND VOLTEX III GRAVITY WARS",
     4: "SOUND VOLTEX IV HEAVENLY HAVEN",
-    5: "SOUND VOLTEX V Vivid Wave",
+    5: "SOUND VOLTEX V VIVID WAVES",
     6: "SOUND VOLTEX EXCEED GEAR"
-    }
-
+}
 
 if "Windows" == platform.system():
     FFMPEG = r"ffmpeg.exe"
@@ -44,12 +43,14 @@ else:
 
 OVERWRITE = False
 
+
 # Credits to giltay @ stackoverflow 120656
-def listdirFP(d):
+def list_dir_fp(d):
     return [os.path.join(d, f) for f in os.listdir(d)]
 
+
 # Friendly interface to use the program
-def CLI():
+def cli():
     print("Welcome to SDVX song extractor")
     # Fetch game folder path
     while True:
@@ -61,7 +62,7 @@ def CLI():
             print("I can't see any soundvoltex.dll here :C")
     # Fetch audio format choice
     while True:
-        print("Choose your format!\n", "-"*30)
+        print("Choose your format!\n", "-" * 30)
         for i, audioFormat in audioFormats.items():
             print("%s = %s}" % (i, audioFormat))
         format = input("> ")
@@ -72,132 +73,134 @@ def CLI():
             print("Incorrect format specified")
     return gameFolder, format
 
+
 # Gets list of all full relative paths to wanted .s3v files
-def getSongPaths(gameFolder):
-    songPaths = []
-    songsFolder = os.path.join(gameFolder, relativeSongFolderPath)
-    for songFolder in listdirFP(songsFolder):
+def get_song_paths(game_folder):
+    song_paths = []
+    songs_folder = os.path.join(game_folder, relativeSongFolderPath)
+    for songFolder in list_dir_fp(songs_folder):
         if os.path.isdir(songFolder):
-            for filename in listdirFP(songFolder):
+            for filename in list_dir_fp(songFolder):
                 if filename.endswith(".s3v") and not filename.endswith("_pre.s3v"):
-                    songPaths.append(filename)
+                    song_paths.append(filename)
                 elif filename.endswith(".2dx") and not filename.endswith("_pre.2dx"):
-                    songPaths.append(filename)
-    return songPaths
+                    song_paths.append(filename)
+    return song_paths
+
 
 # Convert and-or copy songs and place them in music directory
-def extractSongs(songPaths, format, metadatas):
-    outputFolder = os.path.join(outputDir, format)
-    if not os.path.exists(outputFolder):
-        os.makedirs(outputFolder)
+def extract_songs(song_paths, output_format, metadata):
+    output_folder = os.path.join(outputDir, output_format)
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
     for name in VERSIONS.values():
-        if not os.path.exists(os.path.join(outputFolder, name)):
-            os.makedirs(os.path.join(outputFolder, name))
+        if not os.path.exists(os.path.join(output_folder, name)):
+            os.makedirs(os.path.join(output_folder, name))
     # ID3v2.3
     meta_params = {
-        "title": '%s',                      # Title
-        "artist": '%s',                     # Artist
-        "album_artist": "Various Artist",   # Album Artist
-        "album": '%s',                      # Album
-        "genre": '%s',                      # Genre
-        "date": '%04d',                     # Year
-        "track": '%d',                      # Track
-        "disc": '%d',                       # Disc (Version)
-        "TBPM": '%s',                       # BPM
+        "title": '%s',  # Title
+        "artist": '%s',  # Artist
+        "album_artist": "Various Artist",  # Album Artist
+        "album": '%s',  # Album
+        "genre": '%s',  # Genre
+        "date": '%04d',  # Year
+        "track": '%d',  # Track
+        "disc": '%d',  # Disc (Version)
+        "TBPM": '%s',  # BPM
     }
     cmd = {
         "wav": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3''',
         "mp3": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3 -q:a 0''',
         "asf": False
-    }[format]
+    }[output_format]
 
     for key, meta in meta_params.items():
         cmd += ''' -metadata:g %s="%s"''' % (key, meta)
     cmd += r' "%s"'
 
-    for songPath in songPaths:
-        filename = os.path.basename(songPath)
-        songId = filename.split("_")[0]
-        if (int(songId) not in metadatas):
-            print("Skipping %s, because removed from music_db.xml" % songId)
+    for song_path in song_paths:
+        filename = os.path.basename(song_path)
+        song_id = filename.split("_")[0]
+        if int(song_id) not in metadata:
+            print("Skipping %s, because removed from music_db.xml" % song_id)
             continue
-        meta = metadatas[int(songId)]
-        outputFile = os.path.join(outputFolder, VERSIONS[meta["version"]], filename[:-3] + format)
+        meta = metadata[int(song_id)]
+        output_file = os.path.join(output_folder, VERSIONS[meta["version"]], filename[:-3] + output_format)
         overwrite = False
         # overwrite = "&" in meta["title"] or "&" in meta["artist"]
-        if (not os.path.exists(outputFile)) or overwrite:
-            jacketPath = getJacket(songPath,int(songId))
+        if (not os.path.exists(output_file)) or overwrite:
+            jacket_path = get_jacket(song_path, int(song_id))
 
             bpm = meta["bpm_min"]
             if not bpm == meta["bpm_max"]:
                 bpm = meta["bpm_max"]
-            
-            title = cmdEscape(meta["title"])
-            artist = cmdEscape(meta["artist"])
 
+            title = cmd_escape(meta["title"])
+            artist = cmd_escape(meta["artist"])
 
             if filename.endswith(".2dx"):
                 # .2dx file needs convert to wave files
-                iidx_cmd = r'2dx_extract\\bin\\2dx_extract.exe "%s"' % (songPath)
+                iidx_cmd = r'2dx_extract\\bin\\2dx_extract.exe "%s"' % song_path
                 subprocess.run(iidx_cmd, shell=True, check=True)
-                filename = filename.replace(".2dx",".s3v")
+                filename = filename.replace(".2dx", ".s3v")
                 # rename to s3v file
-                songPath = songPath.replace(".2dx", ".s3v")
-                if os.path.exists(songPath) == False:
+                song_path = song_path.replace(".2dx", ".s3v")
+                if not os.path.exists(song_path):
                     # copy extracted from .2dx wave file as .s3v
-                    shutil.copy2("1.wav", songPath)
+                    shutil.copy2("1.wav", song_path)
                 # remove temporary files
                 for wfiles in os.listdir("."):
                     if os.path.isfile(wfiles) and wfiles.endswith(".wav"):
                         os.remove(wfiles)
 
             exec_cmd = cmd % (
-                songPath,
-                jacketPath,
+                song_path,
+                jacket_path,
                 title, artist,
                 VERSIONS[meta["version"]], meta["genre"],
                 int(meta["release_year"]),
-                int(songId), int(meta["version"]), bpm,
-                outputFile,
-                )
+                int(song_id), int(meta["version"]), bpm,
+                output_file,
+            )
             try:
                 subprocess.run(exec_cmd, shell=True, check=True) \
-                if cmd else shutil.copy2(songPath, outputFile)
+                    if cmd else shutil.copy2(song_path, output_file)
             except subprocess.CalledProcessError as e:
                 print("\n===================================\n" \
-                    + exec_cmd + \
-                    "\n===================================\n")
+                      + exec_cmd + \
+                      "\n===================================\n")
                 print("ERROR", e.stderr)
 
 
-def getJacket(songPath, songId):
-    songDir = os.path.dirname(songPath)
-    dataDir = os.path.normpath(os.path.join(songDir, os.path.pardir, os.path.pardir))
-    file_suffix = os.path.splitext(os.path.basename(songPath))[0].split("_")[-1]
-    if file_suffix in rankSuffix :
-        jkFile = 'jk_{0:04d}_{1}_b.png'.format(songId, file_suffix[0])
-        jkPath = os.path.join(songDir,jkFile)
-        if os.path.exists(jkPath):
-            return jkPath
+def get_jacket(song_path, song_id):
+    song_dir = os.path.dirname(song_path)
+    data_dir = os.path.normpath(os.path.join(song_dir, os.path.pardir, os.path.pardir))
+    file_suffix = os.path.splitext(os.path.basename(song_path))[0].split("_")[-1]
+    if file_suffix in rankSuffix:
+        jk_file = 'jk_{0:04d}_{1}_b.png'.format(song_id, file_suffix[0])
+        jk_path = os.path.join(song_dir, jk_file)
+        if os.path.exists(jk_path):
+            return jk_path
     for rank in sorted(rankMap.keys(), reverse=True):
-        jkFile = 'jk_{0:04d}_{1}_b.png'.format(songId, rank)
-        jkPath = os.path.join(songDir,jkFile)
-        if os.path.exists(jkPath):
-            return jkPath
-    return os.path.join(dataDir, "graphics", "jk_dummy_b.png")
+        jk_file = 'jk_{0:04d}_{1}_b.png'.format(song_id, rank)
+        jk_path = os.path.join(song_dir, jk_file)
+        if os.path.exists(jk_path):
+            return jk_path
+    return os.path.join(data_dir, "graphics", "jk_dummy_b.png")
 
-def extractSongsMetadata(songPaths, gameFolder):
-    metadatum={}
-    songIds = [int(os.path.basename(filename).split("_")[0]) for filename in songPaths]
 
-    with open(os.path.join(gameFolder, relativeMusicDbPath), "r", encoding="Shift-JIS", errors="ignore") as xmlFile:
+def extract_songs_metadata(song_paths, game_folder):
+    metadatum = {}
+    song_ids = [int(os.path.basename(filename).split("_")[0]) for filename in song_paths]
+
+    with open(os.path.join(game_folder, relativeMusicDbPath), "r", encoding="Shift-JIS", errors="ignore") as xmlFile:
         soup = BeautifulSoup(xmlFile.read(), "lxml")
 
     metas = soup.find_all("music")
     for meta in metas:
         metadatum[int(meta["id"])] = {
-            "title": fixBrokenChars(meta.find("title_name").text),
-            "artist": fixBrokenChars(meta.find("artist_name").text),
+            "title": fix_broken_chars(meta.find("title_name").text),
+            "artist": fix_broken_chars(meta.find("artist_name").text),
             "genre": meta.find("genre").text,
             # "title_sort": jaconv.h2z(meta.find("title_yomigana").text),
             # "artist_sort": jaconv.h2z(meta.find("artist_yomigana").text),
@@ -208,10 +211,10 @@ def extractSongsMetadata(songPaths, gameFolder):
             "volume": int(meta.find("volume").text) / 127.0,
             "track": int(meta["id"])
         }
-    
+
     metadatum[9001] = {
         "title": "SOUND VOLTEX Tutorial",
-        "artist": "SOND VOLTEX Team",
+        "artist": "SOUND VOLTEX Team",
         "genre": "Tutorial",
         # "title_sort": "さうんどぼるてっくすちゅーとりある",
         # "artist_sort": "さうんどぼるてっくすちーむ",
@@ -225,9 +228,10 @@ def extractSongsMetadata(songPaths, gameFolder):
 
     return metadatum
 
+
 # ref: https://gist.github.com/hannahherbig/d67c2bfefcca207640c001e0ddd5e000
-def fixBrokenChars(name):
-    map = [
+def fix_broken_chars(name):
+    broken_chars_list = [
         # ['\u014d', '驪'],
         ['\u203E', '~'],
         ['\u301C', '～'],
@@ -254,6 +258,7 @@ def fixBrokenChars(name):
         ['\u9B2F', 'ī'],
         ['\u9EF7', 'ē'],
         ['\u9F63', 'Ú'],
+        ['\u01B5', 'Ƶ'],
         ['\u9F67', 'Ä'],
         ['\u9F6A', '♣'],
         ['\u9F72', '♥'],
@@ -267,40 +272,41 @@ def fixBrokenChars(name):
         ['\u76E5', '⚙'],
 
     ]
-    for m in map:
+    for m in broken_chars_list:
         name = name.replace(m[0], m[1])
     return name
 
 
-def cmdEscape(str):
+def cmd_escape(string_input: str):
     if "Windows" == platform.system():
         # For PowerSehll 
-        map = [
+        escape_file = [
             ['"', '\`"'],
             # ['&', '\\&'],
         ]
     else:
         # Linux
-        map = [
+        escape_file = [
             ['"', '\"'],
             ['$', '\$']
         ]
-    for repl in map:
-        str = str.replace(repl[0], repl[1])
-    return str
+    for repl in escape_file:
+        return string_input.replace(repl[0], repl[1])
 
 
-def main(argv = None):
+def main(argv=None):
     try:
-        opts, args = getopt.getopt(argv, "hw",["help","overwrite"])
+        opts, args = getopt.getopt(argv, "hw", ["help", "overwrite"])
     except getopt.GetoptError:
-      print("$0 -i <inputfile> -o <outputfile>")
+        print("$0 -i <inputfile> -o <outputfile>")
 
-    gameFolder, format = CLI()
-    songPaths = getSongPaths(gameFolder)
+    game_folder, output_format = cli()
+    song_paths = get_song_paths(game_folder)
     print("Loading meta datum...")
-    metadatas = extractSongsMetadata(songPaths, gameFolder)
+    music_metadatas = extract_songs_metadata(song_paths, game_folder)
     print("Extract songs...")
-    extractSongs(songPaths, format, metadatas)
+    extract_songs(song_paths, output_format, music_metadatas)
     print("Finished !")
+
+
 main()
