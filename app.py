@@ -1,8 +1,7 @@
 import os
+import platform
 import shutil
 import subprocess
-# import jaconv
-import platform, getopt
 from bs4 import BeautifulSoup
 
 relativeSongFolderPath = "data/music"
@@ -54,8 +53,8 @@ def cli():
     print("Welcome to SDVX song extractor")
     # Fetch game folder path
     while True:
-        gameFolder = input("Insert path to SDVX folder > ")
-        if os.path.exists(gameFolder) and "soundvoltex.dll" in os.listdir(gameFolder):
+        game_folder = input("Insert path to SDVX folder > ")
+        if os.path.exists(game_folder) and "soundvoltex.dll" in os.listdir(game_folder):
             print("OK, that path looks legit, yesssss")
             break
         else:
@@ -65,13 +64,13 @@ def cli():
         print("Choose your format!\n", "-" * 30)
         for i, audioFormat in audioFormats.items():
             print("%s = %s}" % (i, audioFormat))
-        format = input("> ")
-        if format in audioFormats.keys():
+        output_format = input("> ")
+        if output_format in audioFormats.keys():
             print("OK starting...")
             break
         else:
             print("Incorrect format specified")
-    return gameFolder, format
+    return game_folder, output_format
 
 
 # Gets list of all full relative paths to wanted .s3v files
@@ -166,8 +165,8 @@ def extract_songs(song_paths, output_format, metadata):
                 subprocess.run(exec_cmd, shell=True, check=True) \
                     if cmd else shutil.copy2(song_path, output_file)
             except subprocess.CalledProcessError as e:
-                print("\n===================================\n" \
-                      + exec_cmd + \
+                print("\n===================================\n"
+                      + exec_cmd +
                       "\n===================================\n")
                 print("ERROR", e.stderr)
 
@@ -237,7 +236,9 @@ def fix_broken_chars(name):
         ['\u301C', '～'],
         ['\u49FA', 'ê'],
         ['\u58ec', 'ê'],
+        ['\u7F47', 'ê'],
         ['\u5F5C', 'ū'],
+        ['\u8515', 'ῦ'],
         ['\u66E6', 'à'],
         ['\u66E9', 'è'],
         ['\u9F77', 'é'],
@@ -246,12 +247,14 @@ def fix_broken_chars(name):
         ['\u8d81', 'Ǣ'],
         ['\u8e59', 'ℱ'],
         ['\u91c1', '🍄'],
+        ['\u994C', '²'],
         ['\u9448', '♦'],
         ['\u96cb', 'Ǜ'],
         ['\u973B', '♠'],
         ['\u983d', 'ä'],
         ['\u9A2B', 'á'],
         ['\u9A69', 'Ø'],
+        ['\u7162', 'ø'],
         ['\u9A6A', 'ō'],
         ['\u9A6B', 'ā'],
         ['\u9AAD', 'ü'],
@@ -259,9 +262,11 @@ def fix_broken_chars(name):
         ['\u9EF7', 'ē'],
         ['\u9F63', 'Ú'],
         ['\u01B5', 'Ƶ'],
+        ['\u95C3', 'Ā'],
         ['\u9F67', 'Ä'],
         ['\u9F6A', '♣'],
         ['\u9F72', '♥'],
+        ['\u9B3B', '♃'],
         ['\u9F76', '♡'],
         ['\u9b06', 'Ý'],
         ['\u9b25', 'Ã'],
@@ -279,7 +284,7 @@ def fix_broken_chars(name):
 
 def cmd_escape(string_input: str):
     if "Windows" == platform.system():
-        # For PowerSehll 
+        # For PowerShell
         escape_file = [
             ['"', '\`"'],
             # ['&', '\\&'],
@@ -295,11 +300,6 @@ def cmd_escape(string_input: str):
 
 
 def main(argv=None):
-    try:
-        opts, args = getopt.getopt(argv, "hw", ["help", "overwrite"])
-    except getopt.GetoptError:
-        print("$0 -i <inputfile> -o <outputfile>")
-
     game_folder, output_format = cli()
     song_paths = get_song_paths(game_folder)
     print("Loading meta datum...")
