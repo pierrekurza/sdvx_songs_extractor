@@ -2,6 +2,8 @@ import os
 import platform
 import shutil
 import subprocess
+
+import requests
 from bs4 import BeautifulSoup
 
 relativeSongFolderPath = "data/music"
@@ -11,9 +13,7 @@ relativeMusicDbPath = "data/others/music_db.xml"
 outputDir = "SDVX Music"
 
 audioFormats = {
-    "mp3": "MP3 V0       (verly gud bang for your disk space buck)",
-    "wav": "WAV 1411kbps (only choose this if you hate .ASF format)",
-    "asf": "ASF VBR      (Original, lol .s3v is just .asf but renamed)"
+    "mp3": "MP3 320kb/s",
 }
 
 rankMap = {
@@ -34,6 +34,9 @@ VERSIONS = {
     5: "SOUND VOLTEX V VIVID WAVES",
     6: "SOUND VOLTEX EXCEED GEAR"
 }
+
+charts_json_url = "https://github.com/TNG-dev/Tachi/blob/staging/database-seeds/collections/charts-sdvx.json"
+songs_json_url = "https://github.com/TNG-dev/Tachi/blob/staging/database-seeds/collections/songs-sdvx.json"
 
 if "Windows" == platform.system():
     FFMPEG = r"ffmpeg.exe"
@@ -109,7 +112,7 @@ def extract_songs(song_paths, output_format, metadata):
     }
     cmd = {
         "wav": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3''',
-        "mp3": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -map 0:0 -map 1:0 -id3v2_version 3 -q:a 0''',
+        "mp3": FFMPEG + ''' -y -ss 0.9 -i "%s" -i "%s" -ab 320k -map 0:0 -map 1:0 -id3v2_version 3 -q:a 0''',
         "asf": False
     }[output_format]
 
@@ -186,6 +189,22 @@ def get_jacket(song_path, song_id):
         if os.path.exists(jk_path):
             return jk_path
     return os.path.join(data_dir, "graphics", "jk_dummy_b.png")
+
+
+def get_songs_metadata(songs_path: str, charts_path: str):
+    songs_meta = {}
+    songs_json_data = ""
+    charts_json_data = ""
+    if not songs_path or not charts_path:
+        songs_json = requests.get(songs_json_url)
+        charts_json = requests.get(charts_json_url)
+        if songs_json.status_code == 200:
+            songs_json_data = songs_json.json()
+            charts_json_data = charts_json.json()
+    else:
+        # utiliser les json fournis
+
+
 
 
 def extract_songs_metadata(song_paths, game_folder):
